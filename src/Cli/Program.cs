@@ -1,32 +1,57 @@
-using System.Text.Encodings.Web;
-using System.Text.Json;
 using Core;
+using Core.Dto;
+using Core.Import;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-EnvironmentReport report = EnvironmentInfo.Collect();
-
-if (args.Contains("--json"))
+if (args.Contains("--env"))
 {
-    var options = new JsonSerializerOptions
-    {
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        WriteIndented = true
-    };
-    Console.WriteLine(JsonSerializer.Serialize(report, options));
-    return;
+    EnvironmentReport env = EnvironmentInfo.Collect();
+    Console.WriteLine($"{env.OsDescription} | {env.FrameworkDescription} | {env.ReportedRid} | {env.BuildNote}");
 }
 
-Console.WriteLine("CrossApp — інформація про середовище");
-Console.WriteLine("Студент: Назар Мазовіта");
-Console.WriteLine(new string('-', 52));
-Console.WriteLine($"ОС (OSDescription) : {report.OsDescription}");
-Console.WriteLine($"ОС (Environment)   : {report.OsVersion}");
-Console.WriteLine($"Runtime            : {report.FrameworkDescription}");
-Console.WriteLine($"Версія CLR         : {report.ClrVersion}");
-Console.WriteLine($"Архітектура        : {report.ProcessArchitecture}");
-Console.WriteLine($"RID (визначено)    : {report.DetectedRid}");
-Console.WriteLine($"RID (від .NET)     : {report.ReportedRid}");
-Console.WriteLine($"Каталог застосунку : {report.BaseDirectory}");
-Console.WriteLine($"Поточний каталог   : {report.CurrentDirectory}");
-Console.WriteLine($"Збірка             : {report.BuildNote}");
+bool batches = args.Contains("--batches");
+string[] paths = args.Where(a => !a.StartsWith("--")).ToArray();
+string path = paths.Length > 0
+    ? paths[0]
+    : Path.Combine("data", batches ? "batches.csv" : "sample.csv");
+
+if (!File.Exists(path))
+{
+    Console.WriteLine($"Файл не знайдено: {Path.GetFullPath(path)}");
+    return 1;
+}
+
+if (batches)
+{
+    ImportResult<StockBatchDto> result = StockBatchCsvImporter.Load(path);
+    Console.WriteLine($"Завантажено партій: {result.Items.Count}");
+    foreach (StockBatchDto b in result.Items.Take(5))
+        Console.WriteLine($"  {b.Id,-6} {b.ProductId,-6} {b.Quantity,6} {b.ArrivedOn:yyyy-MM-dd}  до {b.ExpiresOn?.ToString("yyyy-MM-dd") ?? "—"}");
+    PrintErrors(result);
+}
+else
+{
+    ImportResult<ProductDto> result = Path.GetExtension(path).ToLowerInvariant() switch
+    {
+        ".json" => ProductJsonImporter.Load(path),
+        _ => ProductCsvImporter.Load(path)
+    };
+    Console.WriteLine($"Завантажено товарів: {result.Items.Count}");
+    foreach (ProductDto p in result.Items.Take(5))
+        Console.WriteLine($"  {p.Id,-6} {p.Sku,-8} {p.Name,-26} {p.Price,9:F2} грн/{p.Unit,-3} {p.Category ?? "—"}");
+    PrintErrors(result);
+}
+
+return 0;
+
+static void PrintErrors<T>(ImportResult<T> result)
+{
+    if (result.Errors.Count > 0)
+    {
+        Console.WriteLine($"Пропущено рядків: {result.Errors.Count}");
+        foreach (string e in result.Errors)
+            Console.WriteLine($"  ! {e}");
+    }
+    Console.WriteLine($"Усього: {result.Total} / прийнято: {result.Items.Count} / пропущено: {result.Errors.Count} / помилок: {result.ErrorPercent:F1}%");
+}

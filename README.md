@@ -12,11 +12,14 @@ CrossApp/
   CrossApp.slnx
   README.md
   .gitignore
+  data/                   вхідні файли (sample.csv, valid.csv, batches.csv, sample.json)
   src/
     Core/                 class library (net8.0; net10.0)
       Core.csproj
       EnvironmentInfo.cs  збір інформації про середовище (namespace Core)
       EnvironmentReport.cs record з даними про середовище
+      Dto/                record-типи даних: ProductDto, StockBatchDto, ImportResult<T>
+      Import/             імпортери CSV/JSON (ProductCsvImporter, StockBatchCsvImporter, ProductJsonImporter)
     Cli/                  консольний застосунок, точка входу
       Cli.csproj          ProjectReference -> ../Core/Core.csproj
       Program.cs          лише виклик Core і форматування виводу
@@ -76,6 +79,32 @@ cd src/Cli/bin/Release/net10.0/osx-arm64/publish
 `src/Core/Core.csproj` використовує `<TargetFrameworks>net8.0;net10.0</TargetFrameworks>`,
 у `src/Core/bin/Debug/` з'являються два підкаталоги `net8.0` і `net10.0`.
 Рядок `BuildNote` в `EnvironmentInfo` відрізняється для двох TFM через `#if NET10_0_OR_GREATER`.
+
+## Імпорт даних (лабораторна 3)
+```bash
+dotnet run --project src/Cli                         # data/sample.csv (з помилками)
+dotnet run --project src/Cli -- data/valid.csv       # коректний файл без заголовка
+dotnet run --project src/Cli -- data/sample.json     # JSON-імпортер (за розширенням)
+dotnet run --project src/Cli -- --batches            # партії з data/batches.csv
+dotnet run --project src/Cli -- data/nope.csv        # неіснуючий файл -> код виходу 1
+dotnet run --project src/Cli -- --env                # + рядок про середовище
+```
+
+Формат CSV:
+- роздільник — крапка з комою `;` (константа `CsvImport.Separator`);
+- кодування UTF-8, закінчення рядків LF або CRLF;
+- заголовок необов'язковий: перший рядок, що починається з `id`, пропускається;
+- порожні рядки та рядки, що починаються з `#`, ігноруються;
+- числа — з крапкою (`38.90`), розбір через `CultureInfo.InvariantCulture`; `12,50` вважається помилкою;
+- дати — `yyyy-MM-dd`.
+
+| Файл                | Колонки                                         |
+|---------------------|-------------------------------------------------|
+| `data/sample.csv`   | `id;sku;name;unit;price[;category]`             |
+| `data/batches.csv`  | `id;productId;quantity;arrivedOn[;expiresOn]`   |
+
+У `data/sample.csv` рядки 13–15, а в `data/batches.csv` рядки 10–13 пошкоджені **навмисно** — це тестові дані
+для перевірки обробки помилок.
 
 ## Середовище
 .NET SDK 10.0, Windows 11 x64 / macOS (arm64)
