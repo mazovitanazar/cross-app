@@ -146,7 +146,7 @@ dotnet run --project src/Cli -- --status                          # дод. 3: �
 | `FromDto` проходить ті самі перевірки | як у `Create` | `Product.FromDto`, `StockBatch.FromDto` |
 | Видача товару за FIFO не більше, ніж є в прийнятих непрострочених партіях; лише власні партії; не для знятого з продажу товару; «все або нічого» | InvalidOperationException / ArgumentException | `StockService.IssueFifo` |
 
-Перевірка: у `src/Core/Domain` і `src/Core/Services` немає `Console` і `File.`; `product.Price = -5` і `batch.Remaining = -1` не компілюються (CS0200), `batch.Status = ...` — CS0272.
+Перевірка: у `src/Core/Domain` і `src/Core/Services` немає `Console` і `File.`; `product.Price = -5`, `batch.Remaining = -1` і `batch.Status = ...` у Cli не компілюються (CS0200).
 
 Чому правило FIFO в сервісі, а не в сутності: партія не знає про інші партії товару, а товар не зберігає партій.
 Правило про сумарний доступний залишок охоплює кілька об'єктів, тому живе в `StockService`, який бачить їх усі;
