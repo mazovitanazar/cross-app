@@ -88,6 +88,7 @@ dotnet run --project src/Cli -- data/sample.json     # JSON-імпортер (з
 dotnet run --project src/Cli -- --batches            # партії з data/batches.csv
 dotnet run --project src/Cli -- data/nope.csv        # неіснуючий файл -> код виходу 1
 dotnet run --project src/Cli -- --env                # + рядок про середовище
+dotnet run --project src/Cli -- --catalog            # різнорідний файл data/catalog.csv (P/B)
 ```
 
 Формат CSV:
@@ -102,6 +103,12 @@ dotnet run --project src/Cli -- --env                # + рядок про се�
 |---------------------|-------------------------------------------------|
 | `data/sample.csv`   | `id;sku;name;unit;price[;category]`             |
 | `data/batches.csv`  | `id;productId;quantity;arrivedOn[;expiresOn]`   |
+| `data/catalog.csv`  | `P;<колонки товару>` або `B;<колонки партії>`   |
+
+`data/catalog.csv` (додаткове завдання 2) містить товари і партії в одному файлі: тип рядка задає перша колонка,
+`CatalogCsvImporter` одним `switch` (`["P", .. var rest]`, `["B", .. var rest]`) розводить їх на два списки
+і перевикористовує `ParseLine` наявних імпортерів. Рядки 9–12 пошкоджені навмисно (ціна з комою, нульова
+кількість, невідомий тип `W`, порожня назва).
 
 У `data/sample.csv` рядки 13–15, а в `data/batches.csv` рядки 10–13 пошкоджені **навмисно** — це тестові дані
 для перевірки обробки помилок.

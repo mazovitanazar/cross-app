@@ -14,20 +14,8 @@ internal static class CsvImport
         var items = new List<T>();
         var errors = new List<string>();
 
-        string[] lines = File.ReadAllLines(path, Encoding.UTF8);
-
-        for (int i = 0; i < lines.Length; i++)
+        foreach (var (number, parts) in DataLines(path, headerStart))
         {
-            int number = i + 1;
-            string line = lines[i];
-
-            if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
-                continue;
-            if (number == 1 && line.StartsWith(headerStart, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            string[] parts = line.Split(Separator, StringSplitOptions.TrimEntries);
-
             switch (parse(parts))
             {
                 case ParseOk<T> ok:
@@ -40,5 +28,25 @@ internal static class CsvImport
         }
 
         return new ImportResult<T>(items, errors);
+    }
+
+    // Рядки з даними: без порожніх, коментарів (#) і заголовка; кожен — номер у файлі + колонки.
+    // Спільний обхід для всіх CSV-імпортерів, зокрема різнорідного CatalogCsvImporter.
+    public static IEnumerable<(int Number, string[] Parts)> DataLines(string path, string? headerStart)
+    {
+        string[] lines = File.ReadAllLines(path, Encoding.UTF8);
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            int number = i + 1;
+            string line = lines[i];
+
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
+                continue;
+            if (number == 1 && headerStart is not null && line.StartsWith(headerStart, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            yield return (number, line.Split(Separator, StringSplitOptions.TrimEntries));
+        }
     }
 }

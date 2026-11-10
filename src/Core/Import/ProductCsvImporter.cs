@@ -12,7 +12,7 @@ public static class ProductCsvImporter
     public static ImportResult<ProductDto> Load(string path) =>
         CsvImport.Load(path, "id", ParseLine);
 
-    private static ParseOutcome<ProductDto> ParseLine(string[] parts) => parts switch
+    internal static ParseOutcome<ProductDto> ParseLine(string[] parts) => parts switch
     {
         { Length: < 5 } => Fail($"очікую 5-6 колонок, отримав {parts.Length}"),
         { Length: > 6 } => Fail($"занадто багато колонок: {parts.Length}"),

@@ -11,7 +11,7 @@ public static class StockBatchCsvImporter
     public static ImportResult<StockBatchDto> Load(string path) =>
         CsvImport.Load(path, "id", ParseLine);
 
-    private static ParseOutcome<StockBatchDto> ParseLine(string[] parts) => parts switch
+    internal static ParseOutcome<StockBatchDto> ParseLine(string[] parts) => parts switch
     {
         not { Length: 4 or 5 } => Fail($"очікую 4-5 колонок, отримав {parts.Length}"),
         [_, "", ..] => Fail("не вказано товар партії"),
