@@ -19,7 +19,9 @@ CrossApp/
       EnvironmentInfo.cs  збір інформації про середовище (namespace Core)
       EnvironmentReport.cs record з даними про середовище
       Dto/                record-типи даних: ProductDto, StockBatchDto, ImportResult<T>
-      Import/             імпортери CSV/JSON (ProductCsvImporter, StockBatchCsvImporter, ProductJsonImporter)
+      Domain/             сутності з поведінкою: Product, StockBatch, BatchStatus (тиждень 4)
+      Import/             імпортери CSV/JSON + DomainImport (DTO -> сутності)
+      Services/           StockService — правило «товар + його партії» (FIFO-видача)
     Cli/                  консольний застосунок, точка входу
       Cli.csproj          ProjectReference -> ../Core/Core.csproj
       Program.cs          лише виклик Core і форматування виводу
@@ -112,6 +114,43 @@ dotnet run --project src/Cli -- --catalog            # різнорідний ф
 
 У `data/sample.csv` рядки 13–15, а в `data/batches.csv` рядки 10–13 пошкоджені **навмисно** — це тестові дані
 для перевірки обробки помилок.
+
+## Доменна модель (лабораторна 4)
+```bash
+dotnet run --project src/Cli -- --domain                          # успіх + порушення інваріантів, ToDto/FromDto
+dotnet run --project src/Cli -- --domain-import data/domain.json  # дод. 1: DTO -> сутності + помилки інваріантів
+dotnet run --project src/Cli -- --fifo                            # дод. 2: правило двох сутностей у StockService
+dotnet run --project src/Cli -- --status                          # дод. 3: стани партії і допустимі переходи
+```
+
+Сутності в `src/Core/Domain`:
+- `Product` — товар каталогу: ціна в приватному полі `_price`, змінюється лише `ChangePrice`; `Discontinue` знімає з продажу (`IsDiscontinued { get; private set; }`).
+- `StockBatch` — партія товару: залишок у приватному полі `_remaining`, змінюється лише `Issue`; стан `BatchStatus` змінюють `Accept`, `WriteOff` і `Issue`.
+- Зв'язок: `StockBatch.ProductId` → `Product.Id` (у товару може бути багато партій).
+- Records тижня 3 (`ProductDto`, `StockBatchDto`) лишились форматом даних; мапінг — `ToDto()` / `FromDto(dto)`, причому `FromDto` викликає `Create`.
+
+Інваріанти:
+
+| Правило | Тип винятку | Де перевіряється |
+| --- | --- | --- |
+| Id, SKU, назва, одиниця товару не порожні (SKU зберігається у верхньому регістрі) | ArgumentException | `Product.Create` |
+| Ціна > 0 (і при створенні, і при зміні) | ArgumentOutOfRangeException | `Product.Create`, `Product.ChangePrice` |
+| Ціну знятого з продажу товару змінити не можна; зняти з продажу двічі не можна | InvalidOperationException | `Product.ChangePrice`, `Product.Discontinue` |
+| Id партії і товар партії не порожні | ArgumentException | `StockBatch.Create` |
+| Кількість у партії > 0 | ArgumentOutOfRangeException | `StockBatch.Create` |
+| Термін придатності не раніший за дату надходження | ArgumentOutOfRangeException | `StockBatch.Create` |
+| Кількість видачі > 0 | ArgumentOutOfRangeException | `StockBatch.Issue`, `StockService.IssueFifo` |
+| Видавати можна лише з прийнятої (Accepted) і непростроченої партії | InvalidOperationException | `StockBatch.Issue` |
+| Не можна видати більше, ніж лишилось у партії | InvalidOperationException | `StockBatch.Issue` |
+| Дозволені лише переходи Pending→Accepted, Pending→WrittenOff, Accepted→Depleted, Accepted→WrittenOff | InvalidOperationException | `StockBatch.CanTransition` (switch expression) |
+| `FromDto` проходить ті самі перевірки | як у `Create` | `Product.FromDto`, `StockBatch.FromDto` |
+| Видача товару за FIFO не більше, ніж є в прийнятих непрострочених партіях; лише власні партії; не для знятого з продажу товару; «все або нічого» | InvalidOperationException / ArgumentException | `StockService.IssueFifo` |
+
+Перевірка: у `src/Core/Domain` і `src/Core/Services` немає `Console` і `File.`; `product.Price = -5` і `batch.Remaining = -1` не компілюються (CS0200), `batch.Status = ...` — CS0272.
+
+Чому правило FIFO в сервісі, а не в сутності: партія не знає про інші партії товару, а товар не зберігає партій.
+Правило про сумарний доступний залишок охоплює кілька об'єктів, тому живе в `StockService`, який бачить їх усі;
+з тижня 5 сервіс отримуватиме товар і партії зі сховищ.
 
 ## Середовище
 .NET SDK 10.0, Windows 11 x64 / macOS (arm64)
